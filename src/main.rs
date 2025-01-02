@@ -14,6 +14,9 @@ struct VoxelObject {
     aabb: Aabb3d,
 }
 
+// Thickness of the bone voxel, whatever axis is not the longest will be this thick
+const BONE_VOXEL_THICKNESS: f32 = 10.0;
+
 fn main() {
     App::new()
         // window size 640x480
@@ -29,16 +32,16 @@ fn main() {
             speed: 100.0,         // default: 12.0
         })
         .add_plugins(NoCameraPlayerPlugin)
-        .add_systems(Startup, yo)
+        .add_systems(Startup, convert)
         .run();
 }
 
-fn yo(
+fn convert(
     mut commands: Commands,
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
 ) {
-    let (document, data, images) = gltf::import("./input/Fox.gltf").unwrap();
+    let (document, _data, _images) = gltf::import("./input/Fox.gltf").unwrap();
 
     let armature_name = "b_Hip_01";
     let root_armature = document
@@ -48,7 +51,7 @@ fn yo(
 
     let mut voxel_aabbs: Vec<VoxelObject> = Vec::new();
 
-    something(root_armature, 0, &mut voxel_aabbs, None);
+    create_voxel_aabbs_from_skeleton(root_armature, 0, &mut voxel_aabbs, None);
 
     for voxel in voxel_aabbs.iter() {
         println!("Voxel: {:?}", voxel);
@@ -66,22 +69,21 @@ fn yo(
         ));
     }
 
-    let mut henk = dot_vox::load("input/3x3x3.vox").unwrap();
-
-    println!("henk: {:?}", henk);
-
     let mut dot_vox_data = DotVoxData {
         version: 150,
         layers: vec![dot_vox::Layer {
             attributes: Default::default(),
         }],
         models: vec![],
-        palette: vec![dot_vox::Color {
-            r: rand::random(),
-            g: rand::random(),
-            b: rand::random(),
-            a: 255,
-        }; 256],
+        palette: vec![
+            dot_vox::Color {
+                r: rand::random(),
+                g: rand::random(),
+                b: rand::random(),
+                a: 255,
+            };
+            256
+        ],
         materials: vec![],
         scenes: vec![
             dot_vox::SceneNode::Transform {
@@ -126,6 +128,7 @@ fn yo(
     for object in voxel_aabbs.iter() {
         let u_size = (object.aabb.half_size() * 2.0).as_uvec3();
         let model: dot_vox::Model = dot_vox::Model {
+            // magicavoxel uses xzy
             size: dot_vox::Size {
                 x: u_size.x as u32,
                 y: u_size.z as u32,
@@ -148,9 +151,7 @@ fn yo(
             ),
         );
 
-        println!("frame: {:?}", frame);
-        
-        let mut transform_dict =  dot_vox::Dict::new();
+        let mut transform_dict = dot_vox::Dict::new();
         transform_dict.insert("_name".to_string(), object.name.clone());
         dot_vox_data.scenes.push(dot_vox::SceneNode::Transform {
             attributes: transform_dict,
@@ -162,21 +163,18 @@ fn yo(
 
         transform_nodes_indices.push(dot_vox_data.scenes.len() as u32 - 1);
 
-        dot_vox_data.scenes.push(
-            dot_vox::SceneNode::Shape {
+        dot_vox_data.scenes.push(dot_vox::SceneNode::Shape {
+            attributes: Default::default(),
+            models: vec![dot_vox::ShapeModel {
+                model_id: (dot_vox_data.models.len() - 1) as u32,
                 attributes: Default::default(),
-                models: vec![dot_vox::ShapeModel {
-                    model_id: (dot_vox_data.models.len() - 1) as u32,
-                    attributes: Default::default(),
-                }]
-            }
-        );
+            }],
+        });
     }
     dot_vox_data.scenes[1] = dot_vox::SceneNode::Group {
         attributes: Default::default(),
         children: transform_nodes_indices,
     };
-
 
     println!("dot_vox_data: {:?}", dot_vox_data.scenes);
     let mut vox_file = BufWriter::new(File::create("output.vox").unwrap());
@@ -197,7 +195,7 @@ fn yo(
     ));
 }
 
-fn something(
+fn create_voxel_aabbs_from_skeleton(
     node: gltf::Node,
     depth: usize,
     voxel_aabbs: &mut Vec<VoxelObject>,
@@ -217,16 +215,15 @@ fn something(
             (end_position.z + parent_transform.translation.z) / 2.0,
             (end_position.y + parent_transform.translation.y) / 2.0,
         );
-        
+
         let half_extents = Vec3::new(
             (end_position.x - parent_transform.translation.x).abs() / 2.0,
             (end_position.z - parent_transform.translation.z).abs() / 2.0,
             (end_position.y - parent_transform.translation.y).abs() / 2.0,
         );
-        
 
         // we have to make sure the AABB has atleast a size of 1
-        let half_extents = half_extents.max(Vec3::ONE);
+        let half_extents = half_extents.max(Vec3::splat(BONE_VOXEL_THICKNESS / 2.0));
 
         voxel_aabbs.push(VoxelObject {
             name: node.name().unwrap().to_string(),
@@ -243,12 +240,7 @@ fn something(
     );
 
     for child in node.children() {
-        something(
-            child,
-            depth + 1,
-            voxel_aabbs,
-            Some(global_transform),
-        );
+        create_voxel_aabbs_from_skeleton(child, depth + 1, voxel_aabbs, Some(global_transform));
     }
 }
 
