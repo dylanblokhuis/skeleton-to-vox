@@ -77,9 +77,9 @@ fn convert(
         models: vec![],
         palette: vec![
             dot_vox::Color {
-                r: rand::random(),
-                g: rand::random(),
-                b: rand::random(),
+                r: 0,
+                g: 0,
+                b: 0,
                 a: 255,
             };
             256
