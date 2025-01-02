@@ -1,0 +1,11 @@
+[package]
+name = "skeleton-to-vox"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+bevy = "0.15.0"
+dot_vox = "5.1.1"
+gltf = "1.4.1"
+bevy_flycam = { git = "https://github.com/sburris0/bevy_flycam.git", version = "0.15.0"}
+rand = "0.8.5"
