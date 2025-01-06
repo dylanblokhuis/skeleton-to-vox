@@ -9,3 +9,4 @@ dot_vox = "5.1.1"
 gltf = "1.4.1"
 bevy_flycam = { git = "https://github.com/sburris0/bevy_flycam.git", version = "0.15.0"}
 rand = "0.8.5"
+slab = "0.4.9"

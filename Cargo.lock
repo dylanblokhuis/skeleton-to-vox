@@ -3621,6 +3621,7 @@ dependencies = [
  "dot_vox",
  "gltf",
  "rand",
+ "slab",
 ]
 
 [[package]]
